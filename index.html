@@ -1,239 +1,295 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>معسكر الـ 12 ساعة | صُنّاع التفوّق</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        input[type="number"]::-webkit-inner-spin-button, 
-        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
+import React, { useState, useEffect } from 'react';
+import { 
+  Calendar, Clock, BookOpen, CheckCircle, 
+  Brain, Coffee, Target, Award, ArrowRight,
+  Sun, Moon, Star, Bell, ShieldCheck, Plus, Minus, RotateCcw,
+  Zap, HelpCircle, Edit3, Save, Loader2
+} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+// Firebase Configuration from environment
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'study-plan-v1';
 
-        // SVG Icons Component
-        const Icon = ({ name, className = "w-5 h-5" }) => {
-            const icons = {
-                sun: <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41M12 7a5 5 0 110 10 5 5 0 010-10z" />,
-                calendar: <path d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18" />,
-                award: <path d="M12 15l-2 5L9 9l11 4-5 2zm0 0l2 5 3-11-11 4 5 2z" />,
-                book: <path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 001.5 22H20M4 19.5V5a2.5 2.5 0 012.5-2.5H20v14H6.5a2.5 2.5 0 00-2.5 2.5z" />,
-                brain: <path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-5 0V4.5A2.5 2.5 0 019.5 2zM14.5 2A2.5 2.5 0 0012 4.5v15a2.5 2.5 0 005 0V4.5A2.5 2.5 0 0014.5 2z" />,
-                plus: <path d="M12 5v14M5 12h14" />,
-                minus: <path d="M5 12h14" />,
-                reset: <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8m0 0V3m0 5h5" />
-            };
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    {icons[name]}
-                </svg>
-            );
-        };
+const App = () => {
+  const [activeTab, setActiveTab] = useState('daily');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Initial Subjects State
+  const [subjects, setSubjects] = useState([
+    { name: 'العلوم', pages: 270, rate: 4, color: 'bg-emerald-500' },
+    { name: 'الفيزياء', pages: 270, rate: 10, color: 'bg-blue-500' },
+    { name: 'الرياضيات', pages: 400, rate: 15, color: 'bg-indigo-500' },
+    { name: 'الكيمياء', pages: 190, rate: 6, color: 'bg-amber-500' },
+    { name: 'الإنجليزية', pages: 200, rate: 10, color: 'bg-rose-500' },
+    { name: 'الفرنسية', pages: 120, rate: 8, color: 'bg-purple-500' },
+    { name: 'الإسلامية', pages: 100, rate: 5, color: 'bg-teal-600' }, 
+  ]);
 
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('daily');
-            const [subjects, setSubjects] = useState(() => {
-                const saved = localStorage.getItem('study_subjects_v2');
-                return saved ? JSON.parse(saved) : [
-                    { name: 'العلوم', pages: 270, color: 'bg-emerald-500' },
-                    { name: 'الفيزياء', pages: 270, color: 'bg-blue-500' },
-                    { name: 'الرياضيات', pages: 400, color: 'bg-indigo-500' },
-                    { name: 'الكيمياء', pages: 190, color: 'bg-amber-500' },
-                    { name: 'الإنجليزية', pages: 200, color: 'bg-rose-500' },
-                    { name: 'الفرنسية', pages: 120, color: 'bg-purple-500' },
-                    { name: 'الإسلامية', pages: 100, color: 'bg-teal-600' }
-                ];
-            });
+  // Initial Progress State
+  const [progress, setProgress] = useState({
+    'العلوم': 0, 'الفيزياء': 0, 'الرياضيات': 0, 'الكيمياء': 0, 'الإنجليزية': 0, 'الفرنسية': 0, 'الإسلامية': 0
+  });
 
-            const [progress, setProgress] = useState(() => {
-                const saved = localStorage.getItem('study_progress_v2');
-                return saved ? JSON.parse(saved) : {};
-            });
+  const [inputVal, setInputVal] = useState({});
+  const [totalPageInput, setTotalPageInput] = useState({});
 
-            const [inputs, setInputs] = useState({});
-            const [totalInputs, setTotalInputs] = useState({});
+  // (1) Auth Setup
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
 
-            useEffect(() => {
-                localStorage.setItem('study_subjects_v2', JSON.stringify(subjects));
-                localStorage.setItem('study_progress_v2', JSON.stringify(progress));
-            }, [subjects, progress]);
+  // (2) Data Sync with Firestore (Persistent Data)
+  useEffect(() => {
+    if (!user) return;
 
-            const updateProgress = (name, val, isAdd) => {
-                const num = parseInt(val) || 0;
-                if (num <= 0) return;
-                const current = progress[name] || 0;
-                const sub = subjects.find(s => s.name === name);
-                let next = isAdd ? current + num : current - num;
-                next = Math.max(0, Math.min(next, sub.pages));
-                setProgress({...progress, [name]: next});
-                setInputs({...inputs, [name]: ''});
-            };
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'user_data', 'current_state');
+    
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.subjects) setSubjects(data.subjects);
+        if (data.progress) setProgress(data.progress);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore error:", error);
+      setLoading(false);
+    });
 
-            const updateTotal = (name) => {
-                const num = parseInt(totalInputs[name]) || 0;
-                if (num > 0) {
-                    setSubjects(subjects.map(s => s.name === name ? {...s, pages: num} : s));
-                    setTotalInputs({...totalInputs, [name]: ''});
-                }
-            };
+    return () => unsubscribe();
+  }, [user]);
 
-            const resetProgress = (name) => {
-                if(confirm(`هل تريد تصفير إنجاز مادة ${name}؟`)) {
-                    setProgress({...progress, [name]: 0});
-                }
-            };
+  // Helper to save to cloud
+  const saveToCloud = async (newSubjects, newProgress) => {
+    if (!user) return;
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'user_data', 'current_state');
+    try {
+      await setDoc(docRef, { 
+        subjects: newSubjects, 
+        progress: newProgress,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.error("Save error:", err);
+    }
+  };
 
-            return (
-                <div className="max-w-md mx-auto min-h-screen flex flex-col pb-20">
-                    {/* App Header */}
-                    <header className="bg-white p-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-200">
-                        <div className="flex justify-between items-center mb-3">
-                            <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] px-3 py-1 rounded-full font-bold border border-emerald-100">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                وضع العمل دون اتصال
-                            </span>
-                            <span className="text-slate-300 text-[10px] font-bold">صُنّاع التفوّق v2.1</span>
-                        </div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">معسكر الـ 12 ساعة 🚀</h1>
-                        <p className="text-slate-500 text-xs mt-1 font-medium italic">"الالتزام هو الفارق بينك وبين الدرجة التي تطمح لها"</p>
-                    </header>
+  const handleUpdateProgress = async (name, type) => {
+    const val = parseInt(inputVal[name] || 0);
+    if (isNaN(val) || val <= 0) return;
+    
+    const maxPages = subjects.find(s => s.name === name).pages;
+    const currentVal = progress[name];
+    let newVal = currentVal;
 
-                    {/* Navigation Bar */}
-                    <nav className="flex px-4 gap-2 my-6">
-                        {[
-                            {id: 'daily', label: 'البرنامج', icon: 'sun'},
-                            {id: 'weekly', label: 'الجدول', icon: 'calendar'},
-                            {id: 'stats', label: 'الإنجاز', icon: 'award'}
-                        ].map(t => (
-                            <button 
-                                key={t.id} 
-                                onClick={() => setActiveTab(t.id)} 
-                                className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all duration-300 ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'bg-white text-slate-400 border border-slate-100'}`}
-                            >
-                                <Icon name={t.icon} className="w-5 h-5" />
-                                <span className="text-[10px] font-bold">{t.label}</span>
-                            </button>
-                        ))}
-                    </nav>
+    if (type === 'add') {
+      newVal = Math.min(currentVal + val, maxPages);
+    } else if (type === 'subtract') {
+      newVal = Math.max(currentVal - val, 0);
+    }
 
-                    {/* Main Content Area */}
-                    <main className="px-4 flex-grow">
-                        {activeTab === 'daily' && (
-                            <div className="space-y-4 animate-in fade-in duration-500">
-                                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                                    <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2">
-                                        <Icon name="sun" className="text-amber-500" /> الجدول الزمني للمعسكر
-                                    </h3>
-                                    {[
-                                        {t: "05:00 - 09:00", m: "العلوم (فهم عميق)", c: "bg-emerald-500"},
-                                        {t: "10:00 - 14:00", m: "رياضيات / فيزياء", c: "bg-blue-500"},
-                                        {t: "15:30 - 17:30", m: "كيمياء / علوم إضافي", c: "bg-amber-500"},
-                                        {t: "18:30 - 20:30", m: "لغات / تربية إسلامية", c: "bg-rose-500"}
-                                    ].map((item, i) => (
-                                        <div key={i} className="flex items-center gap-4 mb-4 last:mb-0 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                            <span className="text-[10px] font-bold text-slate-400 w-24 text-center">{item.t}</span>
-                                            <div className={`w-1 h-8 rounded-full ${item.c}`}></div>
-                                            <span className="text-xs font-bold text-slate-700">{item.m}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bg-indigo-900 text-white p-6 rounded-[2.5rem] shadow-lg relative overflow-hidden">
-                                    <div className="relative z-10">
-                                        <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-indigo-200 uppercase tracking-widest"><Icon name="brain" className="w-4 h-4"/> ذكاء NotebookLM</h4>
-                                        <p className="text-xs opacity-90 leading-relaxed font-medium">
-                                            استخدم الأداة لإنشاء <b>بودكاست مراجعة</b>، و<b>اختبارات ذاتية</b>، و<b>بطاقات مراجعة</b> من ملفاتك الدراسية خلال فترات المراجعة المخصصة.
-                                        </p>
-                                    </div>
-                                    <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
-                                </div>
-                            </div>
-                        )}
+    const newProgress = { ...progress, [name]: newVal };
+    setProgress(newProgress); // Local update
+    await saveToCloud(subjects, newProgress); // Cloud save
+    setInputVal(prev => ({ ...prev, [name]: '' }));
+  };
 
-                        {activeTab === 'stats' && (
-                            <div className="space-y-4 animate-in slide-in-from-bottom-5">
-                                {subjects.map((sub, i) => {
-                                    const cur = progress[sub.name] || 0;
-                                    const prc = Math.round((cur / sub.pages) * 100);
-                                    return (
-                                        <div key={i} className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden">
-                                            <button onClick={() => resetProgress(sub.name)} className="absolute top-4 left-4 text-slate-200 hover:text-rose-500 transition-colors">
-                                                <Icon name="reset" className="w-4 h-4" />
-                                            </button>
-                                            <div className="flex justify-between items-center mb-3">
-                                                <div className="flex flex-col">
-                                                    <h4 className="font-black text-slate-800 text-lg leading-tight">{sub.name}</h4>
-                                                    <span className="text-[10px] text-slate-400 font-bold">{cur} من {sub.pages} صفحة</span>
-                                                </div>
-                                                <span className="text-2xl font-black text-indigo-600">{prc}%</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 h-3 rounded-full mb-5 overflow-hidden border border-slate-50">
-                                                <div className={`h-full ${sub.color} transition-all duration-700 ease-out`} style={{width: `${prc}%`}}></div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">تحديث الإنجاز:</p>
-                                                    <div className="flex gap-1">
-                                                        <input type="number" value={inputs[sub.name] || ''} onChange={e => setInputs({...inputs, [sub.name]: e.target.value})} placeholder="0" className="w-full p-2 bg-slate-50 rounded-xl text-center text-xs font-bold border focus:ring-1 focus:ring-indigo-300 transition-all outline-none"/>
-                                                        <button onClick={() => updateProgress(sub.name, inputs[sub.name], true)} className={`p-2 text-white rounded-xl ${sub.color} shadow-sm active:scale-90 transition-all`}><Icon name="plus" className="w-5 h-5"/></button>
-                                                        <button onClick={() => updateProgress(sub.name, inputs[sub.name], false)} className="p-2 bg-white text-slate-300 rounded-xl border border-slate-100 active:scale-90 transition-all"><Icon name="minus" className="w-5 h-5"/></button>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <p className="text-[9px] font-bold text-slate-400 uppercase ml-1">تعديل المنهج:</p>
-                                                    <div className="flex gap-1">
-                                                        <input type="number" value={totalInputs[sub.name] || ''} onChange={e => setTotalInputs({...totalInputs, [sub.name]: e.target.value})} placeholder="الكلي" className="w-full p-2 bg-slate-50 rounded-xl text-center text-xs font-bold border focus:ring-1 focus:ring-slate-300 transition-all outline-none"/>
-                                                        <button onClick={() => updateTotal(sub.name)} className="p-2 bg-slate-800 text-white rounded-xl shadow-sm active:scale-90 transition-all text-[10px] font-bold">حفظ</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+  const handleUpdateTotalPages = async (name) => {
+    const newTotal = parseInt(totalPageInput[name] || 0);
+    if (isNaN(newTotal) || newTotal <= 0) return;
 
-                        {activeTab === 'weekly' && (
-                            <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm animate-in zoom-in-95 duration-300">
-                                <div className="grid grid-cols-5 bg-slate-50 p-4 text-[10px] font-black text-slate-500 border-b text-center">
-                                    <div>اليوم</div><div>صباح</div><div>ظهر</div><div>عصر</div><div>مساء</div>
-                                </div>
-                                {['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'].map((d, i) => (
-                                    <div key={i} className="grid grid-cols-5 p-4 text-[9px] font-bold border-b last:border-0 text-center items-center hover:bg-slate-50/50">
-                                        <div className="font-black text-slate-800">{d}</div>
-                                        <div>علوم</div><div>رياضيات</div><div>كيمياء</div><div className="text-slate-300">{i===6?'راحة':'لغات'}</div>
-                                    </div>
-                                ))}
-                                <div className="bg-indigo-50 p-4 text-center">
-                                    <p className="text-[10px] text-indigo-700 font-bold">يوم الجمعة: مراجعة شاملة لدرجة الطموح 🎯</p>
-                                </div>
-                            </div>
-                        )}
-                    </main>
-                    
-                    {/* Quick Access Footer */}
-                    <footer className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-100 p-4 flex justify-center items-center shadow-2xl">
-                        <div className="flex items-center gap-3 bg-indigo-50 px-5 py-2 rounded-full border border-indigo-100">
-                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></div>
-                            <span className="text-[10px] font-black text-indigo-900 tracking-tight">نظام الحفظ التلقائي نشط</span>
-                        </div>
-                    </footer>
+    const newSubjects = subjects.map(sub => 
+      sub.name === name ? { ...sub, pages: newTotal } : sub
+    );
+    setSubjects(newSubjects); // Local update
+    await saveToCloud(newSubjects, progress); // Cloud save
+    setTotalPageInput(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const resetSubjectProgress = async (name) => {
+    const newProgress = { ...progress, [name]: 0 };
+    setProgress(newProgress);
+    await saveToCloud(subjects, newProgress);
+  };
+
+  const pomodoroStructure = [
+    { title: 'بومودورو 1', time: '25 د', type: 'دراسة' },
+    { title: 'استراحة', time: '5 د', type: 'راحة' },
+    { title: 'بومودورو 2', time: '25 د', type: 'دراسة' },
+    { title: 'استراحة', time: '5 د', type: 'راحة' },
+    { title: 'بومودورو 3', time: '25 د', type: 'دراسة' },
+    { title: 'استراحة', time: '5 د', type: 'راحة' },
+    { title: 'بومودورو 4', time: '25 د', type: 'مراجعة' },
+    { title: 'استراحة كبرى', time: '20 د', type: 'راحة' },
+  ];
+
+  const weeklySchedule = [
+    { day: 'السبت', p1: 'علوم', p2: 'رياضيات', p3: 'كيمياء', p4: 'إنجليزي' },
+    { day: 'الأحد', p1: 'علوم', p2: 'فيزياء', p3: 'كيمياء', p4: 'إسلامية' },
+    { day: 'الاثنين', p1: 'علوم', p2: 'رياضيات', p3: 'علوم', p4: 'فرنسي' },
+    { day: 'الثلاثاء', p1: 'علوم', p2: 'فيزياء', p3: 'كيمياء', p4: 'إنجليزي' },
+    { day: 'الأربعاء', p1: 'علوم', p2: 'رياضيات', p3: 'علوم', p4: 'إسلامية' },
+    { day: 'الخميس', p1: 'علوم', p2: 'فيزياء', p3: 'كيمياء', p4: 'فرنسي' },
+    { day: 'الجمعة', p1: 'مراجعة شاملة', p2: 'مراجعة شاملة', p3: 'وقت حر', p4: 'وقت حر' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 font-sans">
+        <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
+        <p className="text-slate-600 font-bold">جاري مزامنة بياناتك السحابية...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-slate-50 font-sans p-4 md:p-8 text-right">
+      {/* Header */}
+      <header className="max-w-6xl mx-auto mb-8 text-center bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold mb-4">
+          <ShieldCheck size={14} /> مزامنة سحابية نشطة ({user?.uid?.substring(0,8)}...)
+        </div>
+        <h1 className="text-4xl font-extrabold text-slate-900 mb-2">معسكر الـ 12 ساعة لصناعة التفوّق 🚀</h1>
+        <p className="text-slate-500 text-lg font-medium italic">"تخصيص كامل، دقة متناهية، إنجاز محفوظ للأبد"</p>
+      </header>
+
+      {/* Navigation */}
+      <div className="max-w-6xl mx-auto mb-6 flex gap-2 overflow-x-auto pb-2">
+        <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl transition-all whitespace-nowrap font-bold ${activeTab === 'daily' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-100'}`}><Sun size={20} /> البرنامج اليومي</button>
+        <button onClick={() => setActiveTab('weekly')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl transition-all whitespace-nowrap font-bold ${activeTab === 'weekly' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-100'}`}><Calendar size={20} /> الجدول الأسبوعي</button>
+        <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl transition-all whitespace-nowrap font-bold ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-100'}`}><Award size={20} /> الإنجاز المحفوظ</button>
+      </div>
+
+      <main className="max-w-6xl mx-auto">
+        {activeTab === 'daily' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Clock className="text-indigo-600 ml-2" /> الجدول الزمني (6 دورات بومودورو)</h2>
+                <div className="space-y-4">
+                  {[
+                    { range: "05:00 - 09:00", title: "الفترة الصباحية", desc: "علوم (أقصى درجات الاستيعاب)", color: "border-emerald-500" },
+                    { range: "10:00 - 14:00", title: "فترة الظهيرة", desc: "الرياضيات والفيزياء (حل مسائل)", color: "border-blue-500" },
+                    { range: "15:30 - 17:30", title: "فترة العصر", desc: "كيمياء أو علوم (مراجعة وتثبيت)", color: "border-amber-500" },
+                    { range: "18:30 - 20:30", title: "الفترة المسائية", desc: "اللغات والتربية الإسلامية", color: "border-rose-500" }
+                  ].map((item, i) => (
+                    <div key={i} className={`flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border-r-4 ${item.color}`}>
+                      <div className="w-28 text-sm font-bold text-slate-500 ml-4">{item.range}</div>
+                      <div><h3 className="font-bold">{item.title}</h3><p className="text-sm text-slate-600">{item.desc}</p></div>
+                    </div>
+                  ))}
+                  <div className="flex items-start gap-4 p-4 bg-indigo-600 text-white rounded-2xl shadow-md">
+                    <div className="w-28 text-sm font-bold ml-4">20:30 - 21:30</div>
+                    <div><h3 className="font-bold">المراجعة التراكمية اليومية</h3><p className="text-sm opacity-90">استعراض خرائط ذهنية لكل ما دُرِس اليوم قبل النوم</p></div>
+                  </div>
                 </div>
-            );
-        };
+              </div>
+            </div>
+            <div className="space-y-6 text-center">
+              <div className="bg-indigo-900 text-white p-6 rounded-3xl shadow-xl">
+                <h2 className="text-xl font-bold mb-4 flex items-center justify-center gap-2"><Brain /> بومودورو (25/5 د)</h2>
+                <div className="space-y-2">
+                  {pomodoroStructure.map((step, idx) => (
+                    <div key={idx} className={`flex justify-between items-center p-3 rounded-xl ${step.type === 'دراسة' ? 'bg-white/10' : step.type === 'مراجعة' ? 'bg-emerald-500/30' : 'bg-black/20'}`}>
+                      <span className="text-sm font-medium">{step.title}</span><span className="font-bold">{step.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        {activeTab === 'weekly' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <table className="w-full text-right border-collapse overflow-x-auto block md:table">
+              <thead><tr className="bg-slate-50 text-center font-bold"><th className="p-4 text-slate-600 border-b">اليوم</th><th className="p-4 text-slate-600 border-b">4 ساعات</th><th className="p-4 text-slate-600 border-b">4 ساعات</th><th className="p-4 text-slate-600 border-b">2 ساعة</th><th className="p-4 text-slate-600 border-b">2 ساعة</th></tr></thead>
+              <tbody>{weeklySchedule.map((row, idx) => (<tr key={idx} className="hover:bg-slate-50/50 border-b last:border-0 text-center"><td className="p-4 font-bold text-slate-900">{row.day}</td><td className="p-4"><span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-indigo-600">{row.p1}</span></td><td className="p-4"><span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-blue-600">{row.p2}</span></td><td className="p-4"><span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-amber-600">{row.p3}</span></td><td className="p-4"><span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-slate-400">{row.p4}</span></td></tr>))}</tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'stats' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-5 duration-500">
+            {subjects.map((sub, idx) => {
+              const currentProgress = progress[sub.name] || 0;
+              const percent = Math.round((currentProgress / sub.pages) * 100);
+              return (
+                <div key={idx} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative group transition-all hover:shadow-lg">
+                  <button onClick={() => resetSubjectProgress(sub.name)} className="absolute top-4 left-4 text-slate-300 hover:text-rose-500 transition-colors"><RotateCcw size={16} /></button>
+                  <div className="flex justify-between items-center mb-4 ml-6">
+                    <div className={`p-3 rounded-2xl ${sub.color} text-white shadow-lg`}><BookOpen size={24} /></div>
+                    <span className="text-2xl font-black text-slate-800">{percent}%</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-1">{sub.name}</h3>
+                  <div className="flex justify-between text-xs text-slate-400 mb-3 font-bold uppercase tracking-wide"><span>{currentProgress} / {sub.pages} صفحة</span></div>
+                  <div className="w-full bg-slate-100 h-3 rounded-full mb-6 overflow-hidden"><div className={`h-full rounded-full transition-all duration-700 ease-out ${sub.color}`} style={{ width: `${percent}%` }}></div></div>
+
+                  <div className="mb-6 pb-4 border-b border-slate-50 space-y-2">
+                    <p className="text-xs text-slate-500 font-bold flex items-center gap-1 uppercase"><Edit3 size={12} /> إجمالي صفحات المادة:</p>
+                    <div className="flex gap-2">
+                      <input type="number" value={totalPageInput[sub.name] || ''} onChange={(e) => setTotalPageInput(prev => ({ ...prev, [sub.name]: e.target.value }))} placeholder={sub.pages.toString()} className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                      <button onClick={() => handleUpdateTotalPages(sub.name)} className="p-2 bg-slate-800 text-white rounded-xl shadow-sm"><Save size={18} /></button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500 font-bold flex items-center gap-1 uppercase"><Target size={12} /> تحديث الإنجاز اليومي:</p>
+                    <input type="number" value={inputVal[sub.name] || ''} onChange={(e) => setInputVal(prev => ({ ...prev, [sub.name]: e.target.value }))} placeholder="عدد الصفحات..." className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 mb-2" />
+                    <div className="flex gap-2">
+                      <button onClick={() => handleUpdateProgress(sub.name, 'add')} className={`flex-1 py-2 rounded-xl text-white font-bold flex items-center justify-center gap-2 shadow-md ${sub.color}`}><Plus size={18} /> إضافة</button>
+                      <button onClick={() => handleUpdateProgress(sub.name, 'subtract')} className="flex-1 py-2 bg-white border-2 border-slate-200 text-slate-400 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"><Minus size={18} /> تصحيح</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+
+      <footer className="max-w-6xl mx-auto mt-12 p-8 bg-indigo-900 rounded-[40px] shadow-2xl relative overflow-hidden text-center text-white">
+        <div className="relative z-10">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl mb-6 shadow-inner"><Brain size={40} className="text-white" /></div>
+          <h2 className="text-3xl font-black mb-4">استراتيجية الذكاء الاصطناعي المُصاحبة</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto text-right mt-8">
+            {[
+              { icon: <Clock />, title: "بودكاست مراجعة", desc: "حوّل ملفات الـ PDF إلى حوار صوتي ممتع تسمعه في فترات الاستراحة." },
+              { icon: <HelpCircle />, title: "اختبارات ذاتية", desc: "اطلب من الأداة توليد أسئلة امتحانية من دروسك لتقييم فهمك الفوري." },
+              { icon: <Zap />, title: "بطاقات مراجعة", desc: "صمّم Flashcards للمفاهيم المعقدة في العلوم والفيزياء لمراجعتها بلمح البصر." }
+            ].map((item, i) => (
+              <div key={i} className="bg-white/10 backdrop-blur-sm p-6 rounded-3xl border border-white/10">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 text-white">{item.icon}</div>
+                <h4 className="font-black text-xl mb-2">{item.title}</h4>
+                <p className="text-xs text-indigo-100/80 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-8 text-indigo-300 font-bold">الأداة المختارة: NotebookLM</p>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
